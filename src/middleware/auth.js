@@ -1,8 +1,6 @@
-// src/middleware/auth.js
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Protect routes – verify JWT and attach user to request
 const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -15,13 +13,22 @@ const protect = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found', data: null });
     }
-    req.user = user; // attach user
+    req.user = user;
     next();
   } catch (err) {
-    console.error(err);
-    return res.status(401).json({ success: false, message: 'Invalid token', data: null });
+    return res.status(401).json({ success: false, message: 'Invalid or expired token', data: null });
   }
 };
 
-module.exports = protect;
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: `Access denied: requires ${roles.join(' or ')} role`,
+      data: null,
+    });
+  }
+  next();
+};
 
+module.exports = { protect, authorize };

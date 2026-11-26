@@ -2,7 +2,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const protect = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,25 +12,57 @@ const generateToken = (id) =>
 router.post('/register', async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: 'User already exists' });
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and password are required',
+        data: null,
+      });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+        data: null,
+      });
+    }
+    if (role && !['employer', 'candidate'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role must be either employer or candidate',
+        data: null,
+      });
+    }
+
+    const exists = await User.findOne({ email: email.toLowerCase() });
+    if (exists) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists',
+        data: null,
+      });
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
-      role,
+      role: role || 'candidate',
     });
 
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+      },
     });
   } catch (err) {
     next(err);
@@ -40,16 +72,33 @@ router.post('/register', async (req, res, next) => {
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+        data: null,
+      });
     }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+        data: null,
+      });
+    }
+
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
+      success: true,
+      message: 'Login successful',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+      },
     });
   } catch (err) {
     next(err);
@@ -57,7 +106,11 @@ router.post('/login', async (req, res, next) => {
 });
 
 router.get('/me', protect, async (req, res) => {
-  res.json(req.user);
+  res.json({
+    success: true,
+    message: 'Current user retrieved',
+    data: req.user,
+  });
 });
 
 module.exports = router;
