@@ -1,6 +1,6 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 
-const BASE_URL = process.env.API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.API_URL || (process.argv[2] || 'http://localhost:5000/api');
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
